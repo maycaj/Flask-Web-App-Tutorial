@@ -1,21 +1,81 @@
-{% extends "base.html" %} {% block title %}Home{% endblock %} {% block content
-%}
-<h1 align="center">Notes</h1>
+{% extends "base.html" %} 
+{% block title %}Home{% endblock %} 
+{% block content %}
+<h1 align="center">Audio Notes</h1>
 <ul class="list-group list-group-flush" id="notes">
   {% for note in user.notes %}
   <li class="list-group-item">
-    {{ note.data }}
-    <button type="button" class="close" onClick="deleteNote({{ note.id }})">
-      <span aria-hidden="true">&times;</span>
+    <audio controls>
+      <source src="{{ url_for('views.get_audio', note_id=note.id) }}" type="audio/wav">
+      Your browser does not support audio playback.
+    </audio>
+    <small class="text-muted">{{ note.date.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+    <button type="button" class="close" data-note-id="{{ note.id }}" onclick="deleteNote(this.getAttribute('data-note-id'))">      <span aria-hidden="true">&times;</span>
     </button>
   </li>
   {% endfor %}
 </ul>
-<form method="POST">
-  <textarea name="note" id="note" class="form-control"></textarea>
-  <br />
-  <div align="center">
-    <button type="submit" class="btn btn-primary">Add Note</button>
-  </div>
-</form>
+
+<div class="mt-4" align="center">
+  <button id="startRecord" class="btn btn-primary">Start Recording</button>
+  <button id="stopRecord" class="btn btn-danger" disabled>Stop Recording</button>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+let mediaRecorder;
+let audioChunks = [];
+
+document.getElementById('startRecord').addEventListener('click', async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const formData = new FormData();
+            formData.append('audio', audioBlob);
+
+            fetch('/add-note', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                }
+            });
+            
+            audioChunks = [];
+        };
+
+        mediaRecorder.start();
+        document.getElementById('startRecord').disabled = true;
+        document.getElementById('stopRecord').disabled = false;
+    } catch (err) {
+        console.error('Error accessing microphone:', err);
+        alert('Could not access microphone. Please ensure microphone permissions are granted.');
+    }
+});
+
+document.getElementById('stopRecord').addEventListener('click', () => {
+    mediaRecorder.stop();
+    document.getElementById('startRecord').disabled = false;
+    document.getElementById('stopRecord').disabled = true;
+});
+
+function deleteNote(noteId) {
+  fetch("/delete-note", {
+    method: "POST",
+    body: JSON.stringify({ noteId: noteId }),
+  }).then((_res) => {
+    window.location.href = "/";
+  });
+}
+
+</script>
 {% endblock %}
