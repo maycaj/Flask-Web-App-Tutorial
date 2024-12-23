@@ -1,17 +1,9 @@
-# Use the official Python image as a base
 FROM python:3.8-slim
-
-# Set the working directory
-WORKDIR /app/website
-
-# Copy the application code
+WORKDIR /Flask-Web-App-Tutorial
 COPY . .
-
-# Install dependencies
 RUN pip install -r requirements.txt
-
-# Expose the port where your Flask app listens (usually 5000)
+ENV PYTHONPATH=/Flask-Web-App-Tutorial
 EXPOSE 8080
-
-# Command to run the Flask app
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8080"]
+ENV FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_RUN_PORT=8080
+CMD ["python", "website/main.py"]
