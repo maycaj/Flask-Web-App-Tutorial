@@ -6,8 +6,17 @@ import io
 import json
 from openai import OpenAI
 import os
+from google.cloud import secretmanager
 
 views = Blueprint('views', __name__)
+
+
+def get_secret(secret_id): # access secret from google cloud
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/811725560577/secrets/{secret_id}/versions/latest"
+    response = client.access_secret_version(request={"name": name})
+    return response.payload.data.decode("UTF-8")
+
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 @views.route('/')

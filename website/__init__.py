@@ -2,6 +2,8 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from os import path
 from flask_login import LoginManager
+from dotenv import load_dotenv
+load_dotenv()
 
 db = SQLAlchemy()
 DB_NAME = "database.db"
