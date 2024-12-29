@@ -3,3 +3,4 @@ Flask-SQLAlchemy
 flask-login
 python-dotenv
 google-cloud-secret-manager
+gunicorn

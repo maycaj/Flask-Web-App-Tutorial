@@ -17,7 +17,12 @@ def get_secret(secret_id): # access secret from google cloud
     response = client.access_secret_version(request={"name": name})
     return response.payload.data.decode("UTF-8")
 
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+def get_openai_key():
+    if os.getenv('LOCAL_DEV'): # if on local computer
+        return os.getenv('OPENAI_API_KEY')
+    return get_secret('OPENAI_API_KEY')
+
+client = OpenAI(api_key=get_openai_key())
 
 @views.route('/')
 @login_required
