@@ -2,7 +2,7 @@
 {% block title %}Home{% endblock %} 
 {% block content %}
 <h1 align="center">Audio Notes</h1>
-<p> Click start recording while speaking with your physician to summarize and save the interaction</p> 
+<p class="text-center font-italic"> Click start recording while speaking with your physician to summarize the interaction</p> 
 <ul class="list-group list-group-flush" id="notes">
   {% for note in user.notes %}
   <li class="list-group-item">
@@ -23,6 +23,17 @@
 <div class="mt-4" align="center">
   <button id="startRecord" class="btn btn-primary">Start Recording</button>
   <button id="stopRecord" class="btn btn-danger" disabled>Stop Recording</button>
+</div>
+
+<div align="center">
+  <br>
+  <p class="text-center font-italic">AI is experimental – double check important information</p>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
 </div>
 {% endblock %}
 
