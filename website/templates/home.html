@@ -22,6 +22,7 @@
 
 <div class="mt-4" align="center">
   <button id="startRecord" class="btn btn-primary">Start Recording</button>
+  <span id="timer">00:00:00</span>
   <button id="stopRecord" class="btn btn-danger" disabled>Stop Recording</button>
 </div>
 
@@ -64,7 +65,13 @@ document.getElementById('startRecord').addEventListener('click', async () => {
                     window.location.reload();
                 }
             });
+
+            // hide record buttons to allow server time to resopnd
+            document.getElementById('startRecord').style.display = 'none';
+            document.getElementById('stopRecord').style.display = 'none';
+            document.getElementById('timer').style.display = 'none';
             
+
             audioChunks = [];
         };
 
@@ -76,6 +83,30 @@ document.getElementById('startRecord').addEventListener('click', async () => {
         alert('Could not access microphone. Please ensure microphone permissions are granted.');
     }
 });
+
+    let startTime;
+    let timerInterval;
+
+    document.getElementById('startRecord').addEventListener('click', () => {
+      startTime = new Date();
+      timerInterval = setInterval(updateTimer, 1000);
+    });
+
+    function updateTimer() {
+      const currentTime = new Date();
+      const elapsedTime = currentTime - startTime; // Time difference in milliseconds
+
+      const totalSeconds = Math.floor(elapsedTime / 1000);
+      const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+      const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+      const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+
+      document.getElementById('timer').textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    document.getElementById('stopRecord').addEventListener('click', () => {
+      clearInterval(timerInterval);
+    });
 
 document.getElementById('stopRecord').addEventListener('click', () => {
     mediaRecorder.stop();
