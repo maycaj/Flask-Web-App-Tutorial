@@ -2,6 +2,7 @@
 {% block title %}Home{% endblock %} 
 {% block content %}
 <h1 align="center">Audio Notes</h1>
+<p> Click start recording while speaking with your physician to summarize and save the interaction</p> 
 <ul class="list-group list-group-flush" id="notes">
   {% for note in user.notes %}
   <li class="list-group-item">
@@ -10,7 +11,7 @@
       Your browser does not support audio playback.
     </audio>
     <p class="mt-2"><strong>Transcription:</strong><br>{{ note.transcription }}</p>
-    <p class="mt-2"><strong>Analysis:</strong><br>{{ note.analysis }}</p>
+    <p class="mt-2"><strong>Explanation and Notes:</strong><br>{{ note.analysis }}</p>
     <small class="text-muted">{{ note.date.strftime('%Y-%m-%d %H:%M:%S') }}</small>
     <button type="button" class="close" data-note-id="{{ note.id }}" onclick="deleteNote(this.getAttribute('data-note-id'))">
       <span aria-hidden="true">&times;</span>
