@@ -26,6 +26,10 @@
   <button id="stopRecord" class="btn btn-danger" disabled>Stop Recording</button>
 </div>
 
+<div id="loadingText" style="display: none; text-align: center; font-weight: bold;">
+  saving and making notes <span id="loadingDots"></span>
+</div>
+
 <div align="center">
   <br>
   <p class="text-center font-italic">AI is experimental – double check important information</p>
@@ -52,10 +56,23 @@ document.getElementById('startRecord').addEventListener('click', async () => {
             audioChunks.push(event.data);
         };
 
+        let loadingInterval;
+
         mediaRecorder.onstop = () => {
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
             const formData = new FormData();
             formData.append('audio', audioBlob);
+
+            // Show the "Loading" text and start the dot animation
+            document.getElementById('loadingText').style.display = 'block';
+            const loadingDots = document.getElementById('loadingDots');
+            let dotCount = 0;
+
+            loadingInterval = setInterval(() => {
+                dotCount = (dotCount + 1) % 4; // Cycle through 0, 1, 2, 3
+                loadingDots.textContent = '.'.repeat(dotCount); // Update the dots
+            }, 500); // Update every 500ms
+
 
             fetch('/add-note', {
                 method: 'POST',
@@ -64,6 +81,9 @@ document.getElementById('startRecord').addEventListener('click', async () => {
                 if (response.ok) {
                     window.location.reload();
                 }
+            }).finally(() => {
+              // Hide loading text 
+              document.getElementById('loadingText').style.display = 'none';
             });
 
             // hide record buttons to allow server time to resopnd
