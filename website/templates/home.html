@@ -1,8 +1,8 @@
 {% extends "base.html" %} 
-{% block title %}Home{% endblock %} 
+{% block title %}MedNote{% endblock %} 
 {% block content %}
-<h1 align="center">Audio Notes</h1>
-<p class="text-center font-italic"> Click start recording while speaking with your physician to summarize the interaction</p> 
+<h1 align="center">MedNote</h1>
+<p class="text-center font-italic"> Click start recording while speaking with your physician to summarize the interaction </p> 
 <ul class="list-group list-group-flush" id="notes">
   {% for note in user.notes %}
   <li class="list-group-item">
@@ -11,9 +11,9 @@
       Your browser does not support audio playback.
     </audio>
     <p class="mt-2"><strong>Transcription:</strong><br></p>
-    <pre style="font-family: inherit; white-space: pre-wrap;">{{ note.transcription }}</pre>
+    <pre style="font-family: inherit; white-space: pre-wrap; font-size: 16px;">{{ note.transcription }}</pre>
     <p class="mt-2"><strong>Explanation and Notes:</strong><br></p>
-    <pre style="font-family: inherit; white-space: pre-wrap;">{{ note.analysis }}</pre>
+    <pre style="font-family: inherit; white-space: pre-wrap; font-size: 16px;">{{ note.analysis }}</pre>
     <small class="text-muted">{{ note.date.strftime('%Y-%m-%d %H:%M:%S') }}</small>
     <button type="button" class="close" data-note-id="{{ note.id }}" onclick="deleteNote(this.getAttribute('data-note-id'))">
       <span aria-hidden="true">&times;</span>
@@ -29,12 +29,12 @@
 </div>
 
 <div id="loadingText" style="display: none; text-align: center; font-weight: bold;">
-  saving and making notes <span id="loadingDots"></span>
+  Saving Mednote <span id="loadingDots"></span>
 </div>
 
 <div align="center">
   <br>
-  <p class="text-center font-italic">AI is experimental – double check important information</p>
+  <p class="text-center font-italic">AI is experimental – double check important information </p>
   <br>
   <br>
   <br>
