@@ -55,6 +55,9 @@ def add_note():
             )
         
         os.remove(temp_path)
+    
+        # for debugging
+        # transcription.text = "I’ve been feeling a burning sensation in my chest after meals, and it’s been happening almost every day. That sounds like it could be acid reflux. I’d recommend avoiding spicy or fatty foods and trying an over-the-counter antacid to see if it helps. Okay, I’ll give that a try. Should I come back if it doesn’t improve?"
 
         completion = client.chat.completions.create(
             model="gpt-4",
@@ -66,6 +69,8 @@ def add_note():
             ]
         )
         analysis = completion.choices[0].message.content
+
+        print('Analysis:\n', analysis)
         
         new_note = Note(
             filename=f'audio_{current_user.id}_{Note.query.count() + 1}.wav',
