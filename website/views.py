@@ -63,7 +63,7 @@ def add_note():
             model="gpt-4",
             messages=[
                 {"role": "system", 
-                 "content": "If this is not a patient-doctor conversation say 'Please provide a patient-doctor conversation.' If this is a transcription of a patient-doctor conversation, follow the remaining instructions: Have one set of bullet points which concisely summarizes the interaction. Have a second set of bullet points that ONLY defines terms a college graduate would not understand. Say 'Thanks for using MedNote' at the end"},
+                 "content": "If this is not a patient-doctor conversation say 'Please provide a patient-doctor conversation.' If this is a transcription of a patient-doctor conversation, follow the remaining instructions: Have one set of bullet points which concisely summarizes the interaction. Have a second set of bullet points that ONLY defines terms a college graduate would not understand."},
                 {"role": "user", 
                  "content": transcription.text}
             ]
