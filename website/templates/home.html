@@ -45,188 +45,233 @@
 {% endblock %}
 
 {% block javascript %}
-<script>let mediaRecorder;
-  let audioChunks = [];
-  
-  document.getElementById('startRecord').addEventListener('click', async () => {
-      try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-              audio: {
-                  channelCount: 1,
-                  sampleRate: 44100,
-                  sampleSize: 16
-              } 
-          });
-          
-          // Specify the MIME type and codec
-          const options = {
-              mimeType: 'audio/webm;codecs=opus',
-              audioBitsPerSecond: 128000
-          };
-          
-          // Fallback if the preferred format isn't supported
-          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-              console.log('Falling back to audio/webm');
-              options.mimeType = 'audio/webm';
-          }
-          
-          mediaRecorder = new MediaRecorder(stream, options);
-          
-          mediaRecorder.ondataavailable = (event) => {
-              if (event.data.size > 0) {
-                  audioChunks.push(event.data);
-              }
-          };
-  
-          let loadingInterval;
-  
-          mediaRecorder.onstop = async () => {
-              // Convert WebM to WAV using audio context
-              const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              
-              try {
-                  const arrayBuffer = await audioBlob.arrayBuffer();
-                  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                  
-                  // Create WAV file
-                  const wavBlob = await convertToWav(audioBuffer);
-                  
-                  const formData = new FormData();
-                  formData.append('audio', wavBlob, 'recording.wav');
-  
-                  // Show loading indicator
-                  document.getElementById('loadingText').style.display = 'block';
-                  const loadingDots = document.getElementById('loadingDots');
-                  let dotCount = 0;
-  
-                  loadingInterval = setInterval(() => {
-                      dotCount = (dotCount + 1) % 4;
-                      loadingDots.textContent = '.'.repeat(dotCount);
-                  }, 500);
-  
-                  const response = await fetch('/add-note', {
-                      method: 'POST',
-                      body: formData
-                  });
-  
-                  if (response.ok) {
-                      window.location.reload();
-                  } else {
-                      throw new Error('Server response was not ok');
-                  }
-              } catch (error) {
-                  console.error('Error processing audio:', error);
-                  alert('Error processing audio. Please try again.');
-              } finally {
-                  document.getElementById('loadingText').style.display = 'none';
-                  clearInterval(loadingInterval);
-                  audioContext.close();
-              }
-  
-              // Reset for next recording
-              audioChunks = [];
-              document.getElementById('startRecord').style.display = 'inline';
-              document.getElementById('stopRecord').style.display = 'inline';
-              document.getElementById('timer').style.display = 'inline';
-          };
-  
-          // Start recording
-          mediaRecorder.start(1000); // Collect data every second
-          document.getElementById('startRecord').disabled = true;
-          document.getElementById('stopRecord').disabled = false;
-          
-      } catch (err) {
-          console.error('Error accessing microphone:', err);
-          alert('Could not access microphone. Please ensure microphone permissions are granted.');
-      }
-  });
-  
-  // Function to convert AudioBuffer to WAV Blob
-  function convertToWav(audioBuffer) {
-      const numOfChannels = audioBuffer.numberOfChannels;
-      const length = audioBuffer.length * numOfChannels * 2;
-      const buffer = new ArrayBuffer(44 + length);
-      const view = new DataView(buffer);
-      const channels = [];
-      let offset = 0;
-      let pos = 0;
-  
-      // Write WAV header
-      writeString(view, 0, 'RIFF');
-      view.setUint32(4, 36 + length, true);
-      writeString(view, 8, 'WAVE');
-      writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, numOfChannels, true);
-      view.setUint32(24, audioBuffer.sampleRate, true);
-      view.setUint32(28, audioBuffer.sampleRate * 2 * numOfChannels, true);
-      view.setUint16(32, numOfChannels * 2, true);
-      view.setUint16(34, 16, true);
-      writeString(view, 36, 'data');
-      view.setUint32(40, length, true);
-  
-      // Write audio data
-      for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-          channels.push(audioBuffer.getChannelData(i));
-      }
-  
-      offset = 44;
-      while (pos < audioBuffer.length) {
-          for (let i = 0; i < numOfChannels; i++) {
-              let sample = Math.max(-1, Math.min(1, channels[i][pos]));
-              sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-              view.setInt16(offset, sample, true);
-              offset += 2;
-          }
-          pos++;
-      }
-  
-      return new Blob([buffer], { type: 'audio/wav' });
-  }
-  
-  function writeString(view, offset, string) {
-      for (let i = 0; i < string.length; i++) {
-          view.setUint8(offset + i, string.charCodeAt(i));
-      }
-  }
-  
-  // Your existing timer code remains the same
-  let startTime;
-  let timerInterval;
-  
-  document.getElementById('startRecord').addEventListener('click', () => {
-      startTime = new Date();
-      timerInterval = setInterval(updateTimer, 1000);
-  });
-  
-  function updateTimer() {
-      const currentTime = new Date();
-      const elapsedTime = currentTime - startTime;
-      const totalSeconds = Math.floor(elapsedTime / 1000);
-      const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-      const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-      const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-      document.getElementById('timer').textContent = `${hours}:${minutes}:${seconds}`;
-  }
-  
-  document.getElementById('stopRecord').addEventListener('click', () => {
-      clearInterval(timerInterval);
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-      }
-      document.getElementById('startRecord').disabled = false;
-      document.getElementById('stopRecord').disabled = true;
-  });
-  
-  function deleteNote(noteId) {
-      fetch("/delete-note", {
-          method: "POST",
-          body: JSON.stringify({ noteId: noteId }),
-      }).then((_res) => {
-          window.location.href = "/";
-      });
-  }
+<script>
+let mediaRecorder;
+let audioChunks = [];
+
+document.getElementById('startRecord').addEventListener('click', async () => {
+    try {
+        // First check if mediaDevices is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Media devices API not supported in this browser');
+        }
+
+        // On iOS, we need simpler audio constraints
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const audioConstraints = isIOS ? 
+            { audio: true } : // Simple constraints for iOS
+            { audio: {
+                channelCount: 1,
+                sampleRate: 44100,
+                sampleSize: 16
+            }};
+
+        console.log('Requesting microphone with constraints:', JSON.stringify(audioConstraints));
+        const stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+        
+        // Try different MIME types in order of preference
+        const mimeTypes = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/ogg;codecs=opus',
+            'audio/ogg',
+            ''  // Last resort - let browser choose
+        ];
+        
+        let selectedMimeType = '';
+        for (const mimeType of mimeTypes) {
+            if (mimeType === '' || MediaRecorder.isTypeSupported(mimeType)) {
+                selectedMimeType = mimeType;
+                console.log('Using MIME type:', selectedMimeType || 'browser default');
+                break;
+            }
+        }
+        
+        const options = {
+            audioBitsPerSecond: 128000
+        };
+        
+        if (selectedMimeType) {
+            options.mimeType = selectedMimeType;
+        }
+        
+        mediaRecorder = new MediaRecorder(stream, options);
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        let loadingInterval;
+
+        mediaRecorder.onstop = async () => {
+            // Convert WebM to WAV using audio context
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            try {
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                // Create WAV file
+                const wavBlob = await convertToWav(audioBuffer);
+                
+                const formData = new FormData();
+                formData.append('audio', wavBlob, 'recording.wav');
+
+                // Show loading indicator
+                document.getElementById('loadingText').style.display = 'block';
+                const loadingDots = document.getElementById('loadingDots');
+                let dotCount = 0;
+
+                loadingInterval = setInterval(() => {
+                    dotCount = (dotCount + 1) % 4;
+                    loadingDots.textContent = '.'.repeat(dotCount);
+                }, 500);
+
+                const response = await fetch('/add-note', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    throw new Error('Server response was not ok');
+                }
+            } catch (error) {
+                console.error('Error processing audio:', error);
+                alert('Error processing audio. Please try again.');
+            } finally {
+                document.getElementById('loadingText').style.display = 'none';
+                clearInterval(loadingInterval);
+                audioContext.close();
+            }
+
+            // Reset for next recording
+            audioChunks = [];
+            document.getElementById('startRecord').style.display = 'inline';
+            document.getElementById('stopRecord').style.display = 'inline';
+            document.getElementById('timer').style.display = 'inline';
+        };
+
+        // Start recording
+        mediaRecorder.start(1000); // Collect data every second
+        document.getElementById('startRecord').disabled = true;
+        document.getElementById('stopRecord').disabled = false;
+        
+    } catch (err) {
+        console.error('Error accessing microphone:', err);
+        
+        // More detailed error messages
+        let errorMessage = 'Could not access microphone. ';
+        
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errorMessage += 'Please ensure microphone permissions are granted in your browser settings.';
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                errorMessage += '\n\nOn iOS devices, please:\n1. Go to Settings > Safari > Microphone\n2. Enable access for this website\n3. Refresh the page';
+            }
+        } else if (err.name === 'NotFoundError') {
+            errorMessage += 'No microphone device was found.';
+        } else if (err.name === 'NotReadableError') {
+            errorMessage += 'Your microphone is already in use by another application.';
+        } else if (err.name === 'SecurityError') {
+            errorMessage += 'Media devices can only be accessed on secure (HTTPS) domains.';
+        } else {
+            errorMessage += `Error: ${err.message || err.name || 'Unknown error'}`;
+        }
+        
+        alert(errorMessage);
+    }
+});
+
+// Function to convert AudioBuffer to WAV Blob
+function convertToWav(audioBuffer) {
+    const numOfChannels = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numOfChannels * 2;
+    const buffer = new ArrayBuffer(44 + length);
+    const view = new DataView(buffer);
+    const channels = [];
+    let offset = 0;
+    let pos = 0;
+
+    // Write WAV header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + length, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numOfChannels, true);
+    view.setUint32(24, audioBuffer.sampleRate, true);
+    view.setUint32(28, audioBuffer.sampleRate * 2 * numOfChannels, true);
+    view.setUint16(32, numOfChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, length, true);
+
+    // Write audio data
+    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+        channels.push(audioBuffer.getChannelData(i));
+    }
+
+    offset = 44;
+    while (pos < audioBuffer.length) {
+        for (let i = 0; i < numOfChannels; i++) {
+            let sample = Math.max(-1, Math.min(1, channels[i][pos]));
+            sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+            view.setInt16(offset, sample, true);
+            offset += 2;
+        }
+        pos++;
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+    }
+}
+
+// Your existing timer code remains the same
+let startTime;
+let timerInterval;
+
+document.getElementById('startRecord').addEventListener('click', () => {
+    startTime = new Date();
+    timerInterval = setInterval(updateTimer, 1000);
+});
+
+function updateTimer() {
+    const currentTime = new Date();
+    const elapsedTime = currentTime - startTime;
+    const totalSeconds = Math.floor(elapsedTime / 1000);
+    const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+    document.getElementById('timer').textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+document.getElementById('stopRecord').addEventListener('click', () => {
+    clearInterval(timerInterval);
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    document.getElementById('startRecord').disabled = false;
+    document.getElementById('stopRecord').disabled = true;
+});
+
+function deleteNote(noteId) {
+    fetch("/delete-note", {
+        method: "POST",
+        body: JSON.stringify({ noteId: noteId }),
+    }).then((_res) => {
+        window.location.href = "/";
+    });
+}
 </script>
 {% endblock %}
