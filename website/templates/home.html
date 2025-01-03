@@ -45,105 +45,188 @@
 {% endblock %}
 
 {% block javascript %}
-<script>
-let mediaRecorder;
-let audioChunks = [];
-
-document.getElementById('startRecord').addEventListener('click', async () => {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
-        };
-
-        let loadingInterval;
-
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            const formData = new FormData();
-            formData.append('audio', audioBlob);
-
-            // Show the "Loading" text and start the dot animation
-            document.getElementById('loadingText').style.display = 'block';
-            const loadingDots = document.getElementById('loadingDots');
-            let dotCount = 0;
-
-            loadingInterval = setInterval(() => {
-                dotCount = (dotCount + 1) % 4; // Cycle through 0, 1, 2, 3
-                loadingDots.textContent = '.'.repeat(dotCount); // Update the dots
-            }, 500); // Update every 500ms
-
-
-            fetch('/add-note', {
-                method: 'POST',
-                body: formData
-            }).then(response => {
-                if (response.ok) {
-                    window.location.reload();
-                }
-            }).finally(() => {
-              // Hide loading text 
-              document.getElementById('loadingText').style.display = 'none';
-            });
-
-            // hide record buttons to allow server time to resopnd
-            document.getElementById('startRecord').style.display = 'none';
-            document.getElementById('stopRecord').style.display = 'none';
-            document.getElementById('timer').style.display = 'none';
-            
-
-            audioChunks = [];
-        };
-
-        mediaRecorder.start();
-        document.getElementById('startRecord').disabled = true;
-        document.getElementById('stopRecord').disabled = false;
-    } catch (err) {
-        console.error('Error accessing microphone:', err);
-        alert('Could not access microphone. Please ensure microphone permissions are granted.');
-    }
-});
-
-    let startTime;
-    let timerInterval;
-
-    document.getElementById('startRecord').addEventListener('click', () => {
+<script>let mediaRecorder;
+  let audioChunks = [];
+  
+  document.getElementById('startRecord').addEventListener('click', async () => {
+      try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+              audio: {
+                  channelCount: 1,
+                  sampleRate: 44100,
+                  sampleSize: 16
+              } 
+          });
+          
+          // Specify the MIME type and codec
+          const options = {
+              mimeType: 'audio/webm;codecs=opus',
+              audioBitsPerSecond: 128000
+          };
+          
+          // Fallback if the preferred format isn't supported
+          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+              console.log('Falling back to audio/webm');
+              options.mimeType = 'audio/webm';
+          }
+          
+          mediaRecorder = new MediaRecorder(stream, options);
+          
+          mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                  audioChunks.push(event.data);
+              }
+          };
+  
+          let loadingInterval;
+  
+          mediaRecorder.onstop = async () => {
+              // Convert WebM to WAV using audio context
+              const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              
+              try {
+                  const arrayBuffer = await audioBlob.arrayBuffer();
+                  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                  
+                  // Create WAV file
+                  const wavBlob = await convertToWav(audioBuffer);
+                  
+                  const formData = new FormData();
+                  formData.append('audio', wavBlob, 'recording.wav');
+  
+                  // Show loading indicator
+                  document.getElementById('loadingText').style.display = 'block';
+                  const loadingDots = document.getElementById('loadingDots');
+                  let dotCount = 0;
+  
+                  loadingInterval = setInterval(() => {
+                      dotCount = (dotCount + 1) % 4;
+                      loadingDots.textContent = '.'.repeat(dotCount);
+                  }, 500);
+  
+                  const response = await fetch('/add-note', {
+                      method: 'POST',
+                      body: formData
+                  });
+  
+                  if (response.ok) {
+                      window.location.reload();
+                  } else {
+                      throw new Error('Server response was not ok');
+                  }
+              } catch (error) {
+                  console.error('Error processing audio:', error);
+                  alert('Error processing audio. Please try again.');
+              } finally {
+                  document.getElementById('loadingText').style.display = 'none';
+                  clearInterval(loadingInterval);
+                  audioContext.close();
+              }
+  
+              // Reset for next recording
+              audioChunks = [];
+              document.getElementById('startRecord').style.display = 'inline';
+              document.getElementById('stopRecord').style.display = 'inline';
+              document.getElementById('timer').style.display = 'inline';
+          };
+  
+          // Start recording
+          mediaRecorder.start(1000); // Collect data every second
+          document.getElementById('startRecord').disabled = true;
+          document.getElementById('stopRecord').disabled = false;
+          
+      } catch (err) {
+          console.error('Error accessing microphone:', err);
+          alert('Could not access microphone. Please ensure microphone permissions are granted.');
+      }
+  });
+  
+  // Function to convert AudioBuffer to WAV Blob
+  function convertToWav(audioBuffer) {
+      const numOfChannels = audioBuffer.numberOfChannels;
+      const length = audioBuffer.length * numOfChannels * 2;
+      const buffer = new ArrayBuffer(44 + length);
+      const view = new DataView(buffer);
+      const channels = [];
+      let offset = 0;
+      let pos = 0;
+  
+      // Write WAV header
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + length, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numOfChannels, true);
+      view.setUint32(24, audioBuffer.sampleRate, true);
+      view.setUint32(28, audioBuffer.sampleRate * 2 * numOfChannels, true);
+      view.setUint16(32, numOfChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, length, true);
+  
+      // Write audio data
+      for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+          channels.push(audioBuffer.getChannelData(i));
+      }
+  
+      offset = 44;
+      while (pos < audioBuffer.length) {
+          for (let i = 0; i < numOfChannels; i++) {
+              let sample = Math.max(-1, Math.min(1, channels[i][pos]));
+              sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+              view.setInt16(offset, sample, true);
+              offset += 2;
+          }
+          pos++;
+      }
+  
+      return new Blob([buffer], { type: 'audio/wav' });
+  }
+  
+  function writeString(view, offset, string) {
+      for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+      }
+  }
+  
+  // Your existing timer code remains the same
+  let startTime;
+  let timerInterval;
+  
+  document.getElementById('startRecord').addEventListener('click', () => {
       startTime = new Date();
       timerInterval = setInterval(updateTimer, 1000);
-    });
-
-    function updateTimer() {
+  });
+  
+  function updateTimer() {
       const currentTime = new Date();
-      const elapsedTime = currentTime - startTime; // Time difference in milliseconds
-
+      const elapsedTime = currentTime - startTime;
       const totalSeconds = Math.floor(elapsedTime / 1000);
       const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
       const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
       const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-
       document.getElementById('timer').textContent = `${hours}:${minutes}:${seconds}`;
-    }
-
-    document.getElementById('stopRecord').addEventListener('click', () => {
+  }
+  
+  document.getElementById('stopRecord').addEventListener('click', () => {
       clearInterval(timerInterval);
-    });
-
-document.getElementById('stopRecord').addEventListener('click', () => {
-    mediaRecorder.stop();
-    document.getElementById('startRecord').disabled = false;
-    document.getElementById('stopRecord').disabled = true;
-});
-
-function deleteNote(noteId) {
-  fetch("/delete-note", {
-    method: "POST",
-    body: JSON.stringify({ noteId: noteId }),
-  }).then((_res) => {
-    window.location.href = "/";
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+      }
+      document.getElementById('startRecord').disabled = false;
+      document.getElementById('stopRecord').disabled = true;
   });
-}
-
+  
+  function deleteNote(noteId) {
+      fetch("/delete-note", {
+          method: "POST",
+          body: JSON.stringify({ noteId: noteId }),
+      }).then((_res) => {
+          window.location.href = "/";
+      });
+  }
 </script>
 {% endblock %}
