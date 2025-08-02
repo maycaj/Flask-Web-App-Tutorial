@@ -18,8 +18,11 @@ def get_secret(secret_id): # access secret from google cloud
     return response.payload.data.decode("UTF-8")
 
 def get_openai_key():
+    '''
+    Used with google secrets: console.cloud.google.com/security/secret-manager/
+    '''
     if os.getenv('LOCAL_DEV'): # if on local computer
-        return os.getenv('OPENAI_API_KEY')
+        return os.getenv('OPENAI_API_KEY') 
     return get_secret('OPENAI_API_KEY')
 
 client = OpenAI(api_key=get_openai_key())
